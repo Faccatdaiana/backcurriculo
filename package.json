@@ -13,8 +13,10 @@
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
+    "dompurify": "^3.2.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "jsdom": "^25.0.1",
     "jsonwebtoken": "^9.0.2",
     "pg-promise": "^11.10.1",
     "xss": "^1.0.15"
