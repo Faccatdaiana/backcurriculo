@@ -1,7 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const xss = require('xss'); 
+const helmet = require('helmet'); // proteger cabeçalhos HTTP
+const xss = require('xss'); // xss
 const DOMPurify = require('dompurify');
 const { JSDOM } = require('jsdom');
 const db = require('./db'); 
@@ -10,14 +11,14 @@ const csrf = require('csrf');
 const tokens = new csrf(); //TOKEN
 
 
-
-
 // DOMPurify
 const window = (new JSDOM('')).window;
 const purify = DOMPurify(window);
 
 app.use(bodyParser.json());
 app.use(cors());
+app.use(helmet()); 
+
 
 // Função de validação 
 function validarCurriculo(req, res, next) {
@@ -39,11 +40,19 @@ function validarCurriculo(req, res, next) {
   next();
 }
 
-// Rota para enviar o token CSRF para o frontend
+  // prevenir manipulação de histórico (Cross-site history manipulation)
+  app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY'); 
+  res.setHeader('X-Content-Type-Options', 'nosniff'); 
+  res.setHeader('Referrer-Policy', 'no-referrer'); // Limita exposição de histórico
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'"); 
+  next();
+});
+
+// Rota para enviar o token no front
 app.get('/api/csrf-token', (req, res) => {
   const csrfToken = tokens.create('secret_key');  // Gerar o token 
-  console.log('Token CSRF gerado:', csrfToken);
-  res.json({ csrfToken });  // Enviar o token como resposta
+  res.json({ csrfToken });  
 });
 
 
@@ -60,9 +69,6 @@ function verificarCsrf(req, res, next) {
 app.post('/api/curriculos', verificarCsrf, validarCurriculo, async (req, res) => {
   const { nome, telefone, email, enderecoWeb, experienciaProfissional } = req.body;
 
-  // Logando o token CSRF recebido
-  console.log('Token CSRF recebido:', req.body._csrf);  // Corrigido para acessar o token no corpo da requisição
-
   try {
     const novoCurriculo = await db.one(
       `INSERT INTO curriculos (nome, telefone, email, endereco_web, experiencia_profissional) 
@@ -71,12 +77,9 @@ app.post('/api/curriculos', verificarCsrf, validarCurriculo, async (req, res) =>
     );
     res.status(201).json(novoCurriculo);
   } catch (error) {
-    console.error('Erro ao cadastrar currículo:', error);
     res.status(500).json({ message: 'Erro ao cadastrar currículo', error: error.message });
   }
 });
-
-
 
 
 
