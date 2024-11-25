@@ -1,11 +1,14 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const xss = require('xss');
+const xss = require('xss'); 
 const DOMPurify = require('dompurify');
 const { JSDOM } = require('jsdom');
 const db = require('./db'); 
 const app = express();
+const csrf = require('csrf');
+const tokens = new csrf(); //TOKEN
+
 
 
 
@@ -36,9 +39,30 @@ function validarCurriculo(req, res, next) {
   next();
 }
 
-// Cadastrar currículo com parâmetros $1,.. evita sql injection
-app.post('/api/curriculos', validarCurriculo, async (req, res) => {
+// Rota para enviar o token CSRF para o frontend
+app.get('/api/csrf-token', (req, res) => {
+  const csrfToken = tokens.create('secret_key');  // Gerar o token 
+  console.log('Token CSRF gerado:', csrfToken);
+  res.json({ csrfToken });  // Enviar o token como resposta
+});
+
+
+// Função de middleware para verificar o token
+function verificarCsrf(req, res, next) {
+  const tokenEnviado = req.body._csrf;  
+  if (!tokens.verify('secret_key', tokenEnviado)) {
+    return res.status(403).json({ message: 'Token CSRF inválido' });
+  }
+  next();
+}
+
+// Rota para cadastrar o currículo
+app.post('/api/curriculos', verificarCsrf, validarCurriculo, async (req, res) => {
   const { nome, telefone, email, enderecoWeb, experienciaProfissional } = req.body;
+
+  // Logando o token CSRF recebido
+  console.log('Token CSRF recebido:', req.body._csrf);  // Corrigido para acessar o token no corpo da requisição
+
   try {
     const novoCurriculo = await db.one(
       `INSERT INTO curriculos (nome, telefone, email, endereco_web, experiencia_profissional) 
@@ -51,6 +75,10 @@ app.post('/api/curriculos', validarCurriculo, async (req, res) => {
     res.status(500).json({ message: 'Erro ao cadastrar currículo', error: error.message });
   }
 });
+
+
+
+
 
 // Todos os currículos
 app.get('/api/curriculos', async (req, res) => {
